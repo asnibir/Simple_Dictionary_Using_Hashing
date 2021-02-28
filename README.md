@@ -2,9 +2,12 @@
 
 This is a simple **English To Bengali** Dictionary using they concept of [Perfect Hashing.](https://en.wikipedia.org/wiki/Perfect_hash_function)
 
-#### Language used
+#### Language Used
 * JAVA
 
 #### Tools
 * Android Studio
 
+#### Credit
+For the Dataset of English to Bengali
+* [Here] (https://raw.githubusercontent.com/rahathossain690/Hash-Dictionary/master/src/Hash_dictionary/E2Bdataset.json)
