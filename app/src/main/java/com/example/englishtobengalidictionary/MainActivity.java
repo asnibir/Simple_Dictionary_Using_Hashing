@@ -1,9 +1,11 @@
 package com.example.englishtobengalidictionary;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
 
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
@@ -30,7 +32,8 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
     //Variables for implementing Hash Functions
     int M = 100000; //total slots
     int m, A, B;
-    int PRIME = 100007;
+    int PRIME = 1000000007;
+    int collisions = 0;
 
     //Arrays to store info and collisions
     int[][] hashArray = new int[M][3];
@@ -42,11 +45,56 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
 
     String strData = "", strLine = "";
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Call function to find TexView and SearchView
+        findView();
+
+        //Find A & B randomly
+        A = getRandomNumberUsingNextInt(1, M);
+        B = getRandomNumberUsingNextInt(0, M);
+
+        //CollisionArray initialization with 0
+        Arrays.fill(collisionArray,0);
+
+        // ArrayList to store the words
+        wordList = new ArrayList<>();
+
+        // Call function to convert Json to String
+        jsonToStringConversion();
+
+        //Initializing key and value of object Word as null
+        for(int i = 0; i < M; i++){
+            Word word = new Word(null, null);
+            wordList.add(word);
+        }
+
+        // Function to check collision in each slot
+        checkCollisionsInEachSlot();
+
+        // calculate maximum collision number
+        int[] temp = new int[M];
+        temp = collisionArray;
+        Arrays.sort(temp);
+        int max_collision = temp[M-1];
+        //Log.d("collisions", "Max Collision: "+max_collision);
+        m = max_collision*max_collision;
+
+        secondWordList = new Word[M][m];
+
+        //collision wise determination of  m, a and b for second hash function
+        determinationOfABM();
+
+        //call hash function for insertion in Hash Table
+        hashFunction();
+    }
+
+    // Find TextView and SearchView
+    public void findView(){
         //TextView
         showText = findViewById(R.id.textViewId);
 
@@ -56,24 +104,16 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
         searchView.setPadding(2, 0, 0, 0);
         searchView.setGravity(Gravity.CENTER_VERTICAL);
         searchView.setOnQueryTextListener(this);
+    }
 
-        //Find A & B randomly
-        A = (int) (Math.random()*13)+1;
-        B = (int) (Math.random()*13);
-        //A = getRandomNumberUsingNextInt(1, M);
-        //B = getRandomNumberUsingNextInt(0, M);
-        Log.d("A", "A = " + A);
-        Log.d("B", "B = " + B);
-        Log.d("Prime", "Prime: " + PRIME);
+    //Random number generator
+    public int getRandomNumberUsingNextInt(int min, int max) {
+        Random random = new Random();
+        return random.nextInt(max - min) + min;
+    }
 
-        //CollisionArray initialization with 0
-        Arrays.fill(collisionArray,0);
-
-        // ArrayList to store the words
-        wordList = new ArrayList<>();
-
-
-        //Json Object to String Conversion
+    //Json Object to String Conversion
+    public void jsonToStringConversion(){
         try {
             BufferedReader bufferedReader = new BufferedReader(
                     new InputStreamReader(getAssets().open("dictionary.json")));
@@ -89,17 +129,12 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
         } catch (IOException e) {
             System.err.println("Unable to read the file.");
         }
+    }
 
+    // To check collisions in each slot
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public void checkCollisionsInEachSlot(){
 
-
-        //Initializing key and value of object Word as null
-        for(int i = 0; i < M; i++){
-            Word word = new Word(null, null);
-            wordList.add(word);
-        }
-        Log.d("slotNo", "onCreate: "+M);
-
-        //To Check Collision Number in each slots
         try {
             jsonObject = new JSONObject(strData);
             Iterator keys = jsonObject.keys();
@@ -111,31 +146,25 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
                 int Key = strToNumConversion(currentKey);
                 int hash_value = primaryHash(Key);
 
+                Word word = wordList.get(hash_value);
+                collisionArray[hash_value]++;
+                /*
                 if(wordList.get(hash_value).getEnWord() == null){
                     Word word = new Word(currentKey, currentValue);
                     wordList.set(hash_value, word);
                 }
                 else {
                     collisionArray[hash_value]++;
-                }
-
+                }*/
 
             }
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
 
-        // max collision number
-        int[] temp = new int[M];
-        temp = collisionArray;
-        Arrays.sort(temp);
-        int max_collision = temp[99999];
-        Log.d("collisions", "Max Collision: "+max_collision);
-        m = max_collision*max_collision;
-
-        secondWordList = new Word[M][m];
-
-        //collision wise determination of  m, a and b for second hash function
+    // Collision wise determination of a, b, m for secondary hash function
+    public void determinationOfABM(){
         for(int i = 0; i < M; i++)
         {
             int a = (int) ((Math.random() * (m - 1)) + 1);
@@ -145,22 +174,10 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
             hashArray[i][1] = a;
             hashArray[i][2] = b;
         }
-
-        //call hash function
-        hashFunction();
     }
 
-    //Random number generator (Probably not needed)
-    public int getRandomNumberUsingNextInt(int min, int max) {
-        Random random = new Random();
-        return random.nextInt(max - min) + min;
-    }
-
-    private int primaryHash(int k) {
-        int mod = 98689;
-        return (((A*k)%mod + B)%mod)%M;
-    }
-
+    // Hash Function
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void hashFunction() {
 
         //Initializing key and value of object Word as null
@@ -183,10 +200,9 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
             int hash_value = primaryHash(uniqueKey);
 
             currentKey = currentKey.toLowerCase();
+            //if(collisionArray[hash_value] == 0)
+            if(collisionArray[hash_value] <= 1){
 
-            if(collisionArray[hash_value] == 0){
-
-                //bnWord.set( num,currentDynamicValue);
                 Word word = new Word(currentKey, currentValue);
                 wordList.set(hash_value, word);
 
@@ -200,14 +216,48 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
 
         }
 
+        int col = 0;
+        for(int i=0; i<collisionArray.length; i++){
+            col+=collisionArray[i];
+        }
+        Log.d("second", "hashFunction: "+collisions+" "+col);
+
     }
 
+
+
+    // String to Number Conversion
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private int strToNumConversion(String text) {
+        int number = 0;
+        text = text.toLowerCase();
+
+        for(int i=0; i<text.length();i++){
+            if(text.charAt(i) >= 'a' && text.charAt(i) <= 'z'){
+                number = (number*26 + (int)text.charAt(i));
+                number = Math.floorMod(number, PRIME);
+            }
+
+        }
+        return number;
+    }
+
+    // Primary Hash Function
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private int primaryHash(int k) {
+        //return (((A*k)%mod + B)%mod)%M;
+        int temp = A*k + B;
+        int temp2 = Math.floorMod(temp, PRIME);
+        return Math.floorMod(temp2, M);
+    }
+
+    // Secondary Hash Function
     private int secondaryHash(int k, int a, int b) {
-        return ((a*k + b)%PRIME)%m;
+        return ((a*k + b)%PRIME)%m; // No need to do floorMod
     }
 
-
-
+    // wordSearching method is called here
+    @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     public boolean onQueryTextSubmit(String query) {
         query = query.toLowerCase();
@@ -220,7 +270,8 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
         return false;
     }
 
-    //To search words
+    //To search words in hash table
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void wordSearching(String wordForSearch) throws JSONException {
 
         String bngWord, engWord;
@@ -229,14 +280,13 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
 
         int hash_value = primaryHash(uniqueKey);
         Word word;
-        if(collisionArray[hash_value] == 0){
-
+        if(collisionArray[hash_value] <= 1){
 
             word = wordList.get(hash_value);
             bngWord = word.getBnWord();
             engWord = word.getEnWord();
 
-            if(wordForSearch.equals(engWord) && bngWord!=null){
+            if(wordForSearch.equals(engWord)){
                 showText.setText(bngWord);
             }
             else{
@@ -259,20 +309,6 @@ public class MainActivity extends AppCompatActivity implements SearchView.OnQuer
 
         }
 
-    }
-
-    private int strToNumConversion(String text) {
-
-        int number = 0;
-        text = text.toLowerCase();
-
-        for(int i=0; i<text.length();i++){
-            if(text.charAt(i) >= 'a' && text.charAt(i) <= 'z'){
-                number = (number*26 + (int)text.charAt(i)) % PRIME; // - 'a' // floorMod
-            }
-
-        }
-        return number;
     }
 
 
